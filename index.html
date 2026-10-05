@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outcome Memories - Randomizer</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    background: #12162b;
+    color: #fff;
+    margin: 0;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 { margin-bottom: 16px; }
+  .contenedor { width: 100%; max-width: 420px; }
+  button {
+    background: #2e6cff;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  button:hover { background: #4a82ff; }
+  button:disabled { background: #3a4060; cursor: not-allowed; }
+  #btnSortear { width: 100%; font-size: 1.1rem; padding: 14px; }
+  .card {
+    background: #1d2342;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .card h2 { margin: 0 0 10px; font-size: 1rem; color: #8fb0ff; }
+  .fila { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .killer { color: #ff6b6b; font-weight: bold; }
+  .agregar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .agregar input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+  }
+  .agregar button { padding: 10px 16px; }
+  .quitar {
+    background: #c0392b;
+    padding: 4px 10px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+  }
+  .quitar:hover { background: #e74c3c; }
+  #mensaje { color: #ffcc66; font-size: 0.9rem; min-height: 1.2em; margin-bottom: 6px; }
+  .contador { color: #8fb0ff; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+  <h1>Sorteo de Partida</h1>
+
+  <div class="contenedor">
+    <div class="card">
+      <h2>JUGADORES <span class="contador" id="contador"></span></h2>
+      <div class="agregar">
+        <input id="nombre" type="text" placeholder="Nombre del jugador" maxlength="20">
+        <button id="btnAgregar" onclick="agregarJugador()">Agregar</button>
+      </div>
+      <div id="mensaje"></div>
+      <div id="lista"></div>
+    </div>
+
+    <button id="btnSortear" onclick="sortear()">Sortear</button>
+    <div id="resultado" style="margin-top:20px;"></div>
+  </div>
+
+<script>
+const MAX_JUGADORES = 8;
+const MIN_JUGADORES = 2; // 1 killer + al menos 1 survivor
+
+const survivors = ["Sonic", "Eggman", "Metal Sonic", "Knuckles", "Cream", "Silver", "Blaze", "Amy", "Tails"];
+const killers = ["Kolossos", "Fleetway", "Tripwire", "2011x"];
+const mapas = ["Not Perfect", "Angel Island", "Mystic Cave", "Green Hill", "YCR", "X Castle"];
+
+let jugadores = ["Kakz", "Saniel", "Manly", "Nono", "Cece", "Tubo", "Jamm"];
+
+// Cargar lista guardada en este navegador (si existe)
+try {
+  const guardado = JSON.parse(localStorage.getItem("jugadores"));
+  if (Array.isArray(guardado) && guardado.length > 0) {
+    jugadores = guardado.slice(0, MAX_JUGADORES);
+  }
+} catch (e) {}
+
+function guardar() {
+  try { localStorage.setItem("jugadores", JSON.stringify(jugadores)); } catch (e) {}
+}
+
+function escapar(texto) {
+  const d = document.createElement("div");
+  d.textContent = texto;
+  return d.innerHTML;
+}
+
+function mostrarMensaje(texto) {
+  document.getElementById("mensaje").textContent = texto;
+}
+
+function renderLista() {
+  document.getElementById("contador").textContent = `(${jugadores.length}/${MAX_JUGADORES})`;
+  document.getElementById("lista").innerHTML = jugadores.map((j, i) =>
+    `<div class="fila"><span>${escapar(j)}</span>
+     <button class="quitar" onclick="quitarJugador(${i})">Quitar</button></div>`
+  ).join("");
+  document.getElementById("btnAgregar").disabled = jugadores.length >= MAX_JUGADORES;
+  document.getElementById("btnSortear").disabled = jugadores.length < MIN_JUGADORES;
+}
+
+function agregarJugador() {
+  const input = document.getElementById("nombre");
+  const nombre = input.value.trim();
+  mostrarMensaje("");
+
+  if (!nombre) return;
+  if (jugadores.length >= MAX_JUGADORES) {
+    mostrarMensaje(`El servidor es de máximo ${MAX_JUGADORES} jugadores.`);
+    return;
+  }
+  if (jugadores.some(j => j.toLowerCase() === nombre.toLowerCase())) {
+    mostrarMensaje("Ese jugador ya está en la lista.");
+    return;
+  }
+  jugadores.push(nombre);
+  input.value = "";
+  guardar();
+  renderLista();
+}
+
+function quitarJugador(i) {
+  jugadores.splice(i, 1);
+  mostrarMensaje("");
+  guardar();
+  renderLista();
+}
+
+document.getElementById("nombre").addEventListener("keydown", e => {
+  if (e.key === "Enter") agregarJugador();
+});
+
+function elegir(lista) {
+  return lista[Math.floor(Math.random() * lista.length)];
+}
+
+// Fisher-Yates
+function mezclar(lista) {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
+function sortear() {
+  if (jugadores.length < MIN_JUGADORES) return;
+
+  const jugadorKiller = elegir(jugadores);
+  const killer = elegir(killers);
+  const jugadoresSurvivors = jugadores.filter(j => j !== jugadorKiller);
+  const asignados = mezclar(survivors).slice(0, jugadoresSurvivors.length);
+  const mapa = elegir(mapas);
+
+  document.getElementById("resultado").innerHTML = `
+    <div class="card">
+      <h2>KILLER</h2>
+      <div class="fila killer"><span>${escapar(jugadorKiller)}</span><span>${killer}</span></div>
+    </div>
+    <div class="card">
+      <h2>SURVIVORS</h2>
+      ${jugadoresSurvivors.map((j, i) =>
+        `<div class="fila"><span>${escapar(j)}</span><span>${asignados[i]}</span></div>`).join("")}
+    </div>
+    <div class="card">
+      <h2>MAPA</h2>
+      <div class="fila"><span>${mapa}</span></div>
+    </div>`;
+}
+
+renderLista();
+</script>
+</body>
+</html>
